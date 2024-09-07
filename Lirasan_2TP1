@@ -1,0 +1,152 @@
+import pygame
+import random
+import time
+
+# Initialize Pygame
+pygame.init()
+
+# Screen dimensions
+SCREEN_WIDTH = 400
+SCREEN_HEIGHT = 600
+
+# Colors
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)  # Color for pipes
+BLACK = (0, 0, 0)    # Color for borders
+SKYBLUE = (135, 206, 235)  # Sky blue color
+
+# Set up the display
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption('Floppy Circle')
+
+# Clock to control frame rate
+clock = pygame.time.Clock()
+
+# Game variables
+turtle_radius = 18  # Radius of the circle representing the turtle
+border_thickness = 3  # Thickness of the black border around the turtle
+turtle_x = 50
+turtle_y = SCREEN_HEIGHT // 2
+turtle_y_velocity = 0
+gravity = 0.5
+flap_strength = -10
+
+pipe_width = 80
+pipe_gap = 150
+pipe_frequency = 1500  # milliseconds
+last_pipe = pygame.time.get_ticks() - pipe_frequency
+pipes = []
+
+# Initialize time tracking
+start_time = 0
+current_time = 0
+longest_time = 0
+record_file = "longest_time.txt"
+
+# Load or initialize longest time record
+try:
+    with open(record_file, "r") as file:
+        longest_time = float(file.read().strip())
+except FileNotFoundError:
+    longest_time = 0
+
+def reset_game():
+    global turtle_x, turtle_y, turtle_y_velocity, last_pipe, pipes, running, start_time, current_time
+    turtle_x = 50
+    turtle_y = SCREEN_HEIGHT // 2
+    turtle_y_velocity = 0
+    pipes = []
+    last_pipe = pygame.time.get_ticks() - pipe_frequency
+    running = True
+    start_time = pygame.time.get_ticks()  # Record the start time
+
+def draw_text(text, size, color, surface, x, y):
+    font = pygame.font.Font(None, size)
+    textobj = font.render(text, True, color)
+    textrect = textobj.get_rect()
+    textrect.center = (x, y)
+    surface.blit(textobj, textrect)
+
+def game_loop():
+    global turtle_y, turtle_y_velocity, last_pipe, pipes, running, current_time, longest_time
+    running = True
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    if not running:
+                        reset_game()
+                    else:
+                        turtle_y_velocity = flap_strength
+
+        if running:
+            # Update game state
+            turtle_y_velocity += gravity
+            turtle_y += turtle_y_velocity
+
+            if pygame.time.get_ticks() - last_pipe > pipe_frequency:
+                last_pipe = pygame.time.get_ticks()
+                pipe_height = random.randint(100, 400)
+                pipes.append([SCREEN_WIDTH, pipe_height])
+
+            for pipe in pipes:
+                pipe[0] -= 5
+                if pipe[0] + pipe_width < 0:
+                    pipes.remove(pipe)
+
+            # Check for collisions
+            for pipe in pipes:
+                if (turtle_x + turtle_radius * 2 > pipe[0] and turtle_x < pipe[0] + pipe_width) and \
+                   (turtle_y < pipe[1] or turtle_y + turtle_radius * 2 > pipe[1] + pipe_gap):
+                    running = False
+
+            if turtle_y > SCREEN_HEIGHT or turtle_y < 0:
+                running = False
+
+            # Update current time
+            current_time = (pygame.time.get_ticks() - start_time) / 1000  # Time in seconds
+
+            # Draw everything
+            screen.fill(SKYBLUE)  # Fill the screen with sky blue
+            
+            # Draw the turtle with black border
+            pygame.draw.circle(screen, BLACK, (turtle_x + turtle_radius, int(turtle_y + turtle_radius)), turtle_radius + border_thickness)
+            pygame.draw.circle(screen, RED, (turtle_x + turtle_radius, int(turtle_y + turtle_radius)), turtle_radius)
+
+            for pipe in pipes:
+                # Draw the green pipe
+                pygame.draw.rect(screen, GREEN, (pipe[0], 0, pipe_width, pipe[1]))
+                pygame.draw.rect(screen, GREEN, (pipe[0], pipe[1] + pipe_gap, pipe_width, SCREEN_HEIGHT))
+
+                # Draw the black border around the pipe
+                pygame.draw.rect(screen, BLACK, (pipe[0], 0, pipe_width, pipe[1]), 2)
+                pygame.draw.rect(screen, BLACK, (pipe[0], pipe[1] + pipe_gap, pipe_width, SCREEN_HEIGHT), 2)
+
+            # Display time and longest time
+            draw_text(f'Time: {int(current_time)}s', 30, BLACK, screen, SCREEN_WIDTH // 2, 30)
+            draw_text(f'Best Time: {int(longest_time)}s', 30, BLACK, screen, SCREEN_WIDTH // 2, 60)
+
+        else:
+            # Update longest time record
+            if current_time > longest_time:
+                longest_time = current_time
+                with open(record_file, "w") as file:
+                    file.write(str(longest_time))
+
+            # Game over screen
+            draw_text('Game Over', 55, BLACK, screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50)
+            draw_text('Press SPACE to Try Again', 30, BLACK, screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 30)
+            draw_text(f'Best Time: {int(longest_time)}s', 30, BLACK, screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80)
+
+        pygame.display.flip()
+        clock.tick(30)
+
+# Main execution
+reset_game()
+game_loop()
+pygame.quit()
